@@ -1,7 +1,8 @@
 # --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
-RUN git clone --depth 1 https://github.com/open-webui/open-webui.git .
+# --- FIX: Cloning a specific stable release instead of the main branch ---
+RUN git clone --depth 1 --branch v0.1.125 https://github.com/open-webui/open-webui.git .
 # --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
 RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
@@ -15,7 +16,7 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
-# --- ADDED: Set ComfyUI URL for Open WebUI integration ---
+# Set ComfyUI URL for Open WebUI integration
 ENV COMFYUI_URL=http://127.0.0.1:8188
 
 # Install system dependencies
@@ -48,7 +49,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 -m pip install -r /app/backend/requirements.txt -U && \
     rm -rf /root/.cache/pip
 
-# --- ADDED: Install ComfyUI ---
+# Install ComfyUI
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     python3 -m pip install -r requirements.txt
