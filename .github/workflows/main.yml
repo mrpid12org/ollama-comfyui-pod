@@ -6,6 +6,9 @@ on:
   # Triggers the workflow on push events but only for the "main" branch
   push:
     branches: [ "main" ]
+  
+  # --- ADDED: This line allows you to manually run the workflow ---
+  workflow_dispatch:
 
 # A workflow is made up of one or more jobs
 jobs:
@@ -34,4 +37,4 @@ jobs:
           context: .
           push: true
           # IMPORTANT: Update the line below with your Docker Hub username and desired image name.
-          tags: sjpgh/ollama-comfyui-image:latest
+          tags: sjpgwh/ollama-comfyui-image:latest
