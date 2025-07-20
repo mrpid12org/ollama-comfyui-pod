@@ -30,10 +30,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
 
+# --- UPDATED: All pip installs combined into a single, more efficient layer ---
 RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir wheel && \
-    python3 -m pip install --no-cache-dir huggingface-hub -r /tmp/webui_requirements.txt -U && \
-    python3 -m pip install --no-cache-dir -r /tmp/ComfyUI/requirements.txt
+    python3 -m pip install --no-cache-dir \
+        wheel \
+        huggingface-hub \
+        -r /tmp/webui_requirements.txt -U \
+        -r /tmp/ComfyUI/requirements.txt
 
 
 # --- STAGE 3: Final Production Image ---
