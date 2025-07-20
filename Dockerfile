@@ -2,7 +2,8 @@
 FROM node:20 as webui-builder
 WORKDIR /app
 RUN git clone --depth 1 https://github.com/open-webui/open-webui.git .
-RUN npm install && npm cache clean --force
+# --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
+RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
 # --- STAGE 2: Final Production Image ---
@@ -60,7 +61,6 @@ COPY idle_shutdown.sh /idle_shutdown.sh
 RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 
 # Expose ports for clarity
-# --- ADDED: Port 8188 for ComfyUI ---
 EXPOSE 8888 8080 8188
 
 # Set the entrypoint to start all services
