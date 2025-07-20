@@ -43,12 +43,12 @@ COPY --from=webui-builder /app/backend /app/backend
 COPY --from=webui-builder /app/build /app/build
 COPY --from=webui-builder /app/CHANGELOG.md /app/CHANGELOG.md
 
+# --- UPDATED: Combined all pip installs into a single, more efficient command ---
 # Install Python dependencies for WebUI and model downloading
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py && \
-    python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U && \
-    # --- ADDED: Install huggingface-hub for downloading models ---
-    python3 -m pip install --no-cache-dir huggingface-hub
+    rm get-pip.py && \
+    python3 -m pip install --no-cache-dir huggingface-hub -r /app/backend/requirements.txt -U
 
 # Install ComfyUI
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
@@ -61,7 +61,7 @@ comfyui:
     base_path: /workspace/comfyui-models
 EOF
 
-# --- ADDED: Create directories for all ComfyUI models ---
+# Create directories for all ComfyUI models
 RUN mkdir -p /workspace/comfyui-models/checkpoints \
              /workspace/comfyui-models/unet \
              /workspace/comfyui-models/vae \
