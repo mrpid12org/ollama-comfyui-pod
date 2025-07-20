@@ -1,11 +1,8 @@
 # --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
-# --- FIX: Reverting to a known stable release to avoid build errors ---
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
-# --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
 RUN npm install --legacy-peer-deps && npm cache clean --force
-# --- FIX: Explicitly install the missing 'lowlight' package for this version ---
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
@@ -18,7 +15,6 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
-# Set ComfyUI URL for Open WebUI integration
 ENV COMFYUI_URL=http://127.0.0.1:8188
 
 # Install system dependencies
@@ -47,13 +43,13 @@ COPY --from=webui-builder /app/backend /app/backend
 COPY --from=webui-builder /app/build /app/build
 COPY --from=webui-builder /app/CHANGELOG.md /app/CHANGELOG.md
 
-# --- FIX: Use --no-cache-dir to reduce disk usage during build ---
-# Install Open WebUI Python dependencies
+# Install Python dependencies for WebUI and model downloading
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py && \
-    python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
+    python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U && \
+    # --- ADDED: Install huggingface-hub for downloading models ---
+    python3 -m pip install --no-cache-dir huggingface-hub
 
-# --- FIX: Use --no-cache-dir to reduce disk usage during build ---
 # Install ComfyUI
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
@@ -64,6 +60,14 @@ RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
 comfyui:
     base_path: /workspace/comfyui-models
 EOF
+
+# --- ADDED: Create directories for all ComfyUI models ---
+RUN mkdir -p /workspace/comfyui-models/checkpoints \
+             /workspace/comfyui-models/unet \
+             /workspace/comfyui-models/vae \
+             /workspace/comfyui-models/clip \
+             /workspace/comfyui-models/loras \
+             /workspace/comfyui-models/t5
 
 # Copy config files and custom scripts
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
