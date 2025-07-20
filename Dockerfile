@@ -45,19 +45,35 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # Copy Open WebUI
 COPY --from=webui-builder /app/backend /app/backend
 COPY --from=webui-builder /app/build /app/build
-# --- FIX: Corrected typo in destination filename ---
 COPY --from=webui-builder /app/CHANGELOG.md /app/CHANGELOG.md
 
+# --- FIX: Use --no-cache-dir to reduce disk usage during build ---
 # Install Open WebUI Python dependencies
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py && \
-    python3 -m pip install -r /app/backend/requirements.txt -U && \
-    rm -rf /root/.cache/pip
+    python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
+# --- FIX: Use --no-cache-dir to reduce disk usage during build ---
 # Install ComfyUI
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
-    python3 -m pip install -r requirements.txt
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Create the ComfyUI config file to make model storage persistent
-RUN tee /opt/Com
+RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
+comfyui:
+    base_path: /workspace/comfyui-models
+EOF
+
+# Copy config files and custom scripts
+COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
+COPY entrypoint.sh /entrypoint.sh
+COPY pull_model.sh /pull_model.sh
+COPY idle_shutdown.sh /idle_shutdown.sh
+RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
+
+# Expose ports for clarity
+EXPOSE 8888 8080 8188
+
+# Set the entrypoint to start all services
+ENTRYPOINT ["/entrypoint.sh"]
