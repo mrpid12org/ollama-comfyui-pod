@@ -5,6 +5,8 @@ WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
 # --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
 RUN npm install --legacy-peer-deps && npm cache clean --force
+# --- FIX: Explicitly install the missing 'lowlight' package for this version ---
+RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
 # --- STAGE 2: Final Production Image ---
@@ -17,7 +19,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
 # Set ComfyUI URL for Open WebUI integration
-ENV COMFYUI_URL=http://12.0.0.1:8188
+ENV COMFYUI_URL=http://127.0.0.1:8188
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
