@@ -1,4 +1,4 @@
-# --- STAGE 1: Build Open WebUI Frontend (No changes) ---
+# --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
@@ -26,11 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install all Python packages into the venv
+# Copy requirements files needed for installation
 COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
 
-# --- UPDATED: All pip installs combined into a single, more efficient layer ---
+# All pip installs are combined into a single, efficient layer to minimize disk usage
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir \
         wheel \
