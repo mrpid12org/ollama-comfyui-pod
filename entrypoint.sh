@@ -3,15 +3,6 @@
 # Ensure the log directory exists before supervisord starts.
 mkdir -p /workspace/logs
 
-# --- Print and validate searxng settings ---
-echo "--- Checking searx settings.yml contents ---"
-if [ -f /usr/local/searxng/searx/settings.yml ]; then
-  grep doi /usr/local/searxng/searx/settings.yml || echo "WARNING: No 'doi' config found!"
-else
-  echo "ERROR: /usr/local/searxng/searx/settings.yml not found!"
-fi
-echo "--- End of settings check ---"
-
 # --- WebUI persistent data fix ---
 WEBUI_DATA_DIR="/app/backend/data"
 PERSISTENT_DATA_DIR="/workspace/webui-data"
