@@ -1,12 +1,10 @@
 # --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
-# Cloning the LATEST stable release
-RUN git clone --depth 1 --branch v0.6.17 https://github.com/open-webui/open-webui.git .
-# Added --legacy-peer-deps to resolve dependency conflicts
+# --- FIX: Reverting to a known stable release to avoid build errors ---
+RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
+# --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
 RUN npm install --legacy-peer-deps && npm cache clean --force
-# --- FIX: Disabling the problematic Pyodide pre-build step ---
-RUN sed -i 's/"build": "npm run pyodide:fetch && vite build"/"build": "vite build"/' package.json
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
 # --- STAGE 2: Final Production Image ---
@@ -19,7 +17,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
 # Set ComfyUI URL for Open WebUI integration
-ENV COMFYUI_URL=http://127.0.0.1:8188
+ENV COMFYUI_URL=http://12.0.0.1:8188
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
