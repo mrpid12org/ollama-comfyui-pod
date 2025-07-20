@@ -30,6 +30,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
 
+# --- DIAGNOSTIC: Check available disk space before installing packages ---
+RUN df -h
+
 # All pip installs are combined into a single, efficient layer to minimize disk usage
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir \
@@ -88,6 +91,7 @@ RUN mkdir -p /workspace/comfyui-models/checkpoints \
              /workspace/comfyui-models/t5
 
 # Copy config files and custom scripts
+# NOTE: Ensure these files exist in the same directory as your Dockerfile
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
