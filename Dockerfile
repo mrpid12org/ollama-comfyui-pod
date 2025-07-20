@@ -2,9 +2,9 @@
 FROM node:20 as webui-builder
 WORKDIR /app
 # --- FIX: Reverting to a known stable release to avoid build errors ---
-RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
+[cite_start]RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git . [cite: 1]
 # --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
-RUN npm install --legacy-peer-deps && npm cache clean --force
+[cite_start]RUN npm install --legacy-peer-deps && npm cache clean --force [cite: 2]
 # --- FIX: Explicitly install the missing 'lowlight' package for this version ---
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     supervisor \
     iproute2 \
+    # --- FIX: Added ffmpeg to support audio features in Open WebUI ---
+    ffmpeg \
     python3.11 \
     python3.11-venv \
     python3-venv \
@@ -36,10 +38,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-dev \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    [cite_start]&& rm -rf /var/lib/apt/lists/* [cite: 3]
 
 # Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+[cite_start]RUN curl -fsSL https://ollama.com/install.sh | sh [cite: 4]
 
 # Copy Open WebUI
 COPY --from=webui-builder /app/backend /app/backend
@@ -64,7 +66,7 @@ comfyui:
 EOF
 
 # Copy config files and custom scripts
-COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
+[cite_start]COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf [cite: 5]
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
