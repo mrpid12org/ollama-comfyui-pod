@@ -1,9 +1,9 @@
 # --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
-# --- FIX: Cloning a specific stable release instead of the main branch ---
+# Cloning a specific stable release instead of the main branch
 RUN git clone --depth 1 --branch v0.1.125 https://github.com/open-webui/open-webui.git .
-# --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
+# Added --legacy-peer-deps to resolve dependency conflicts
 RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
@@ -23,6 +23,8 @@ ENV COMFYUI_URL=http://127.0.0.1:8188
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
+    # --- FIX: Added wget ---
+    wget \
     supervisor \
     iproute2 \
     python3.11 \
@@ -53,6 +55,12 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     python3 -m pip install -r requirements.txt
+
+# --- FIX: Create the ComfyUI config file to make model storage persistent ---
+RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
+comfyui:
+    base_path: /workspace/comfyui-models
+EOF
 
 # Copy config files and custom scripts
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
