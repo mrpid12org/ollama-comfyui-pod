@@ -1,4 +1,4 @@
-# --- STAGE 1: Build Open WebUI Frontend ---
+# --- STAGE 1: Build Open WebUI Frontend (No changes) ---
 FROM node:20 as webui-builder
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
@@ -6,7 +6,37 @@ RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
-# --- STAGE 2: Final Production Image ---
+
+# --- STAGE 2: Build Python Dependencies ---
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 as python-builder
+WORKDIR /build
+
+# Install only build-time system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    python3.11 \
+    python3.11-venv \
+    build-essential \
+    python3.11-dev \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment which will be copied to the final image
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install all Python packages into the venv
+COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
+
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --no-cache-dir wheel && \
+    python3 -m pip install --no-cache-dir huggingface-hub -r /tmp/webui_requirements.txt -U && \
+    python3 -m pip install --no-cache-dir -r /tmp/ComfyUI/requirements.txt
+
+
+# --- STAGE 3: Final Production Image ---
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 # Set environment variables
@@ -16,49 +46,34 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
 ENV COMFYUI_URL=http://127.0.0.1:8188
+# Add the Python virtual environment to the PATH
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Install system dependencies
+# Install only RUNTIME system dependencies (no build tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
     curl \
-    wget \
     supervisor \
-    iproute2 \
     ffmpeg \
-    python3.11 \
-    python3.11-venv \
-    python3-venv \
     libgomp1 \
-    build-essential \
-    python3.11-dev \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    python3.11 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
-# Copy Open WebUI
+# Copy the Python virtual environment from the python-builder stage
+COPY --from=python-builder /opt/venv /opt/venv
+
+# Copy applications from builder stages
 COPY --from=webui-builder /app/backend /app/backend
 COPY --from=webui-builder /app/build /app/build
 COPY --from=webui-builder /app/CHANGELOG.md /app/CHANGELOG.md
-
-# --- UPDATED: Combined all pip installs into a single, more efficient command ---
-# Install Python dependencies for WebUI and model downloading
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py && \
-    rm get-pip.py && \
-    python3 -m pip install --no-cache-dir huggingface-hub -r /app/backend/requirements.txt -U
-
-# Install ComfyUI
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
-    cd /opt/ComfyUI && \
-    python3 -m pip install --no-cache-dir -r requirements.txt
+COPY --from=python-builder /tmp/ComfyUI /opt/ComfyUI
 
 # Create the ComfyUI config file to make model storage persistent
 RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
-comfyui:
-    base_path: /workspace/comfyui-models
+base_path: /workspace/comfyui-models
 EOF
 
 # Create directories for all ComfyUI models
