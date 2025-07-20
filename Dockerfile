@@ -14,6 +14,8 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
+# --- ADDED: Set ComfyUI URL for Open WebUI integration ---
+ENV COMFYUI_URL=http://127.0.0.1:8188
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -45,16 +47,12 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 -m pip install -r /app/backend/requirements.txt -U && \
     rm -rf /root/.cache/pip
 
-# Install and set up SearXNG with uWSGI
-RUN git clone --depth 1 https://github.com/searxng/searxng.git /usr/local/searxng && \
-    cd /usr/local/searxng && \
-    python3 -m venv searx-pyenv && \
-    ./searx-pyenv/bin/pip install -r requirements.txt uwsgi && \
-    mkdir -p /etc/searxng
+# --- ADDED: Install ComfyUI ---
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
+    cd /opt/ComfyUI && \
+    python3 -m pip install -r requirements.txt
 
 # Copy config files and custom scripts
-COPY custom_settings.yml /usr/local/searxng/searx/settings.yml
-COPY uwsgi.ini /etc/searxng/uwsgi.ini
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
@@ -62,7 +60,8 @@ COPY idle_shutdown.sh /idle_shutdown.sh
 RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 
 # Expose ports for clarity
-EXPOSE 8888 8080
+# --- ADDED: Port 8188 for ComfyUI ---
+EXPOSE 8888 8080 8188
 
 # Set the entrypoint to start all services
 ENTRYPOINT ["/entrypoint.sh"]
