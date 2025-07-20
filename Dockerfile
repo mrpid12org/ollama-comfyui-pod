@@ -1,10 +1,12 @@
 # --- STAGE 1: Build Open WebUI Frontend ---
 FROM node:20 as webui-builder
 WORKDIR /app
-# --- FIX: Cloning the LATEST stable release instead of an older one ---
+# Cloning the LATEST stable release
 RUN git clone --depth 1 --branch v0.6.17 https://github.com/open-webui/open-webui.git .
-# --- FIX: Added --legacy-peer-deps to resolve dependency conflicts ---
+# Added --legacy-peer-deps to resolve dependency conflicts
 RUN npm install --legacy-peer-deps && npm cache clean --force
+# --- FIX: Disabling the problematic Pyodide pre-build step ---
+RUN sed -i 's/"build": "npm run pyodide:fetch && vite build"/"build": "vite build"/' package.json
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
 # --- STAGE 2: Final Production Image ---
