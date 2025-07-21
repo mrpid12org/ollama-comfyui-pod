@@ -4,6 +4,9 @@
 # Use the full devel image with all build tools
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
+# --- THIS IS THE VERSION IDENTIFIER ---
+RUN echo "--- DOCKERFILE VERSION: v11-FINAL ---"
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
 
@@ -101,3 +104,4 @@ RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
 ENTRYPOINT ["/entrypoint.sh"]
+EOF
