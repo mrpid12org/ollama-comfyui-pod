@@ -1,40 +1,4 @@
-# --- STAGE 1: Build Open WebUI Frontend ---
-FROM node:20 as webui-builder
-WORKDIR /app
-RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
-RUN npm install --legacy-peer-deps && npm cache clean --force
-RUN npm install lowlight
-RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
-
-
-# --- STAGE 2: Build Python Dependencies ---
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 as python-builder
-WORKDIR /build
-
-# Install only build-time system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    python3.11 \
-    python3.11-dev \
-    python3-pip \
-    build-essential \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements files needed for installation
-COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
-
-# --- UPDATED: Added PyYAML to the installation ---
-# Install all Python packages to the system site-packages, splitting them to avoid conflicts
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
-    python3 -m pip install --no-cache-dir -r /tmp/webui_requirements.txt -U && \
-    python3 -m pip install --no-cache-dir -r /tmp/ComfyUI/requirements.txt
-
-
-# --- STAGE 3: Final Production Image ---
+# --- FINAL SINGLE-STAGE DOCKERFILE ---
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 # Set environment variables
@@ -45,28 +9,37 @@ ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
 ENV COMFYUI_URL=http://127.0.0.1:8188
 
-# Install only RUNTIME system dependencies
+# Install all system dependencies (build-time and runtime)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     curl \
     supervisor \
     ffmpeg \
     libgomp1 \
     python3.11 \
+    python3.11-dev \
+    python3-pip \
+    build-essential \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# --- Build Open WebUI Frontend ---
+WORKDIR /app
+RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
+RUN apt-get update && apt-get install -y nodejs npm && npm install -g n && n 20 && apt-get purge -y nodejs npm # Install Node.js
+RUN npm install --legacy-peer-deps && npm cache clean --force
+RUN npm install lowlight
+RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
-# Copy the installed Python packages from the builder stage
-COPY --from=python-builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
-COPY --from=python-builder /usr/local/bin /usr/local/bin
+# Install Python dependencies for all apps
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
+    python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
-# Copy applications from builder stages
-COPY --from=webui-builder /app/backend /app/backend
-COPY --from=webui-builder /app/build /app/build
-COPY --from=webui-builder /app/CHANGELOG.md /app/CHANGELOG.md
-COPY --from=python-builder /tmp/ComfyUI /opt/ComfyUI
+# Install ComfyUI and its dependencies
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
+    cd /opt/ComfyUI && \
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Create the ComfyUI config file to make model storage persistent
 RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
@@ -81,7 +54,10 @@ RUN mkdir -p /workspace/comfyui-models/checkpoints \
              /workspace/comfyui-models/loras \
              /workspace/comfyui-models/t5
 
-# Copy config files and custom scripts
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Copy all local config files and scripts
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
