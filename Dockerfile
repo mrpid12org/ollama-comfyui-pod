@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-dev \
     python3-pip \
     build-essential \
+    sed \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -37,9 +38,11 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
-# Install ComfyUI and its dependencies
+# --- Install ComfyUI and its dependencies (UPDATED) ---
+# This now removes torch from the requirements to prevent overwriting the CUDA version
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
+    sed -i '/^torch/d' requirements.txt && \
     python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Create directories for all ComfyUI models
