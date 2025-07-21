@@ -1,5 +1,5 @@
 # --- FINAL SINGLE-STAGE DOCKERFILE ---
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -7,7 +7,7 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
-ENV COMFYUI_URL=http://12t7.0.0.1:8188
+ENV COMFYUI_URL=http://127.0.0.1:8188
 
 # Install all system dependencies (build-time and runtime)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,8 +31,7 @@ RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
-# --- UPDATED: Force a compatible PyTorch version to resolve conflicts ---
-# Install Python dependencies
+# --- Install Python dependencies, forcing a compatible PyTorch version ---
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
     python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
@@ -42,19 +41,6 @@ RUN python3 -m pip install --upgrade pip && \
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     python3 -m pip install --no-cache-dir -r requirements.txt
-
-# Create the ComfyUI config file to make model storage persistent
-RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
-checkpoints: /workspace/comfyui-models/checkpoints
-unet: /workspace/comfyui-models/unet
-vae: /workspace/comfyui-models/vae
-clip: /workspace/comfyui-models/clip
-loras: /workspace/comfyui-models/loras
-t5: /workspace/comfyui-models/t5
-controlnet: /workspace/comfyui-models/controlnet
-embeddings: /workspace/comfyui-models/embeddings
-hypernetworks: /workspace/comfyui-models/hypernetworks
-EOF
 
 # Create directories for all ComfyUI models
 RUN mkdir -p /workspace/comfyui-models/checkpoints \
@@ -75,6 +61,8 @@ COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
+# --- UPDATED: Copy the new local config file instead of generating it ---
+COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 
 # Expose ports for clarity
