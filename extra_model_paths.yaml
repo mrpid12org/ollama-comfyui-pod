@@ -1,9 +1,10 @@
-checkpoints: /workspace/comfyui-models/checkpoints
-unet: /workspace/comfyui-models/unet
-vae: /workspace/comfyui-models/vae
-clip: /workspace/comfyui-models/clip
-loras: /workspace/comfyui-models/loras
-t5: /workspace/comfyui-models/t5
-controlnet: /workspace/comfyui-models/controlnet
-embeddings: /workspace/comfyui-models/embeddings
-hypernetworks: /workspace/comfyui-models/hypernetworks
+comfyui:
+  checkpoints: /workspace/comfyui-models/checkpoints
+  unet: /workspace/comfyui-models/unet
+  vae: /workspace/comfyui-models/vae
+  clip: /workspace/comfyui-models/clip
+  loras: /workspace/comfyui-models/loras
+  t5: /workspace/comfyui-models/t5
+  controlnet: /workspace/comfyui-models/controlnet
+  embeddings: /workspace/comfyui-models/embeddings
+  hypernetworks: /workspace/comfyui-models/hypernetworks
