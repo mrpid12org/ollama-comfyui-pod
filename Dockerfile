@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3.11 \
     python3.11-dev \
-    # --- ADDED: The missing pip package ---
     python3-pip \
     build-essential \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
@@ -27,9 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
 
+# --- UPDATED: Added PyYAML to the installation ---
 # Install all Python packages to the system site-packages, splitting them to avoid conflicts
 RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir wheel huggingface-hub && \
+    python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
     python3 -m pip install --no-cache-dir -r /tmp/webui_requirements.txt -U && \
     python3 -m pip install --no-cache-dir -r /tmp/ComfyUI/requirements.txt
 
