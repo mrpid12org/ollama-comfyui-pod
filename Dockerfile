@@ -16,21 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     python3.11 \
-    python3.11-venv \
-    build-essential \
     python3.11-dev \
+    build-essential \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Create a virtual environment which will be copied to the final image
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements files needed for installation
 COPY --from=webui-builder /app/backend/requirements.txt /tmp/webui_requirements.txt
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /tmp/ComfyUI
 
-# --- UPDATED: Split pip installs to resolve dependency conflicts ---
+# Install all Python packages to the system site-packages, splitting them to avoid conflicts
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub && \
     python3 -m pip install --no-cache-dir -r /tmp/webui_requirements.txt -U && \
@@ -47,24 +42,22 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
 ENV COMFYUI_URL=http://127.0.0.1:8188
-# Add the Python virtual environment to the PATH
-ENV PATH="/opt/venv/bin:$PATH"
 
-# Install only RUNTIME system dependencies (no build tools)
+# Install only RUNTIME system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     supervisor \
     ffmpeg \
     libgomp1 \
     python3.11 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
-# Copy the Python virtual environment from the python-builder stage
-COPY --from=python-builder /opt/venv /opt/venv
+# Copy the installed Python packages from the builder stage
+COPY --from=python-builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
 
 # Copy applications from builder stages
 COPY --from=webui-builder /app/backend /app/backend
