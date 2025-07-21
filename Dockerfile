@@ -31,7 +31,6 @@ RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
-# --- UPDATED: Re-added installation of critical libraries ---
 # Install Python dependencies
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
@@ -42,9 +41,18 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     python3 -m pip install --no-cache-dir -r requirements.txt
 
+# --- UPDATED: Switched to a more explicit and robust YAML config format ---
 # Create the ComfyUI config file to make model storage persistent
 RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
-base_path: /workspace/comfyui-models
+checkpoints: /workspace/comfyui-models/checkpoints
+unet: /workspace/comfyui-models/unet
+vae: /workspace/comfyui-models/vae
+clip: /workspace/comfyui-models/clip
+loras: /workspace/comfyui-models/loras
+t5: /workspace/comfyui-models/t5
+controlnet: /workspace/comfyui-models/controlnet
+embeddings: /workspace/comfyui-models/embeddings
+hypernetworks: /workspace/comfyui-models/hypernetworks
 EOF
 
 # Create directories for all ComfyUI models
@@ -53,7 +61,10 @@ RUN mkdir -p /workspace/comfyui-models/checkpoints \
              /workspace/comfyui-models/vae \
              /workspace/comfyui-models/clip \
              /workspace/comfyui-models/loras \
-             /workspace/comfyui-models/t5
+             /workspace/comfyui-models/t5 \
+             /workspace/comfyui-models/controlnet \
+             /workspace/comfyui-models/embeddings \
+             /workspace/comfyui-models/hypernetworks
 
 # Install Ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
