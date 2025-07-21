@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3.11 \
     python3.11-dev \
+    # --- ADDED: The missing pip package ---
+    python3-pip \
     build-essential \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -58,6 +60,7 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 
 # Copy the installed Python packages from the builder stage
 COPY --from=python-builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
+COPY --from=python-builder /usr/local/bin /usr/local/bin
 
 # Copy applications from builder stages
 COPY --from=webui-builder /app/backend /app/backend
