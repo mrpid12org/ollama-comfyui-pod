@@ -24,13 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- Build Open WebUI Frontend ---
+# --- Build Open WebUI Frontend (UPDATED FOR SPACE EFFICIENCY) ---
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
-RUN apt-get update && apt-get install -y nodejs npm && npm install -g n && n 20 && apt-get purge -y nodejs npm # Install Node.js
-RUN npm install --legacy-peer-deps && npm cache clean --force
-RUN npm install lowlight
-RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
+
+# This single RUN command builds the frontend and cleans up in one layer to save space
+RUN apt-get update && apt-get install -y nodejs npm && \
+    npm install -g n && \
+    n 20 && \
+    npm install --legacy-peer-deps && \
+    npm install lowlight && \
+    NODE_OPTIONS="--max-old-space-size=6144" npm run build && \
+    npm cache clean --force && \
+    rm -rf /app/node_modules && \
+    apt-get purge -y --auto-remove nodejs npm && \
+    rm -rf /var/lib/apt/lists/*
 
 # --- Install Python dependencies, forcing a compatible PyTorch version ---
 RUN python3 -m pip install --upgrade pip && \
@@ -38,8 +46,8 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
-# --- Install ComfyUI and its dependencies (UPDATED) ---
-# This now removes torch from the requirements to prevent overwriting the CUDA version
+# --- Install ComfyUI and its dependencies ---
+# This removes torch from the requirements to prevent overwriting the CUDA version
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     sed -i '/^torch/d' requirements.txt && \
@@ -64,7 +72,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
 COPY pull_model.sh /pull_model.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
-# --- UPDATED: Copy the new local config file instead of generating it ---
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 
