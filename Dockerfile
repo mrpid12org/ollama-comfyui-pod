@@ -31,7 +31,8 @@ RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
-# Install Python dependencies for all apps
+# --- UPDATED: Re-added installation of critical libraries ---
+# Install Python dependencies
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
