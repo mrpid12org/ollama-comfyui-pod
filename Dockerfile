@@ -7,7 +7,7 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
 ENV PIP_ROOT_USER_ACTION=ignore
-ENV COMFYUI_URL=http://127.0.0.1:8188
+ENV COMFYUI_URL=http://12t7.0.0.1:8188
 
 # Install all system dependencies (build-time and runtime)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,9 +31,11 @@ RUN npm install --legacy-peer-deps && npm cache clean --force
 RUN npm install lowlight
 RUN NODE_OPTIONS="--max-old-space-size=6144" npm run build
 
+# --- UPDATED: Force a compatible PyTorch version to resolve conflicts ---
 # Install Python dependencies
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
+    python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
 # Install ComfyUI and its dependencies
@@ -41,7 +43,6 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     python3 -m pip install --no-cache-dir -r requirements.txt
 
-# --- UPDATED: Switched to a more explicit and robust YAML config format ---
 # Create the ComfyUI config file to make model storage persistent
 RUN tee /opt/ComfyUI/extra_model_paths.yaml > /dev/null <<EOF
 checkpoints: /workspace/comfyui-models/checkpoints
