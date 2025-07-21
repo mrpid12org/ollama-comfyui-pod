@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v14-PYTHON-DEFAULT-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: v17-UI-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -50,6 +50,7 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --pre --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121 && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
+# --- 5. Install ComfyUI and its requirements ---
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     sed -i '/^torch/d' requirements.txt && \
@@ -82,6 +83,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- 2. Copy built assets from the 'builder' stage ---
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/backend /app/backend
+# --- THIS IS THE FIX ---
+COPY --from=builder /app/build /app/backend/build
 COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
