@@ -104,4 +104,3 @@ RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
 ENTRYPOINT ["/entrypoint.sh"]
-EOF
