@@ -84,6 +84,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- 2. Copy built assets from the 'builder' stage ---
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/backend /app/backend
+COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
 # --- 3. Create required directories ---
