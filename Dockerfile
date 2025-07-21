@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v11-FINAL ---"
+RUN echo "--- DOCKERFILE VERSION: v12-MANUAL-VENV ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -36,8 +36,16 @@ RUN apt-get update && apt-get install -y nodejs npm && \
     apt-get purge -y --auto-remove nodejs npm && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 3. Prepare Python Virtual Environment ---
-RUN python3 -m venv /opt/venv
+# --- 3. Prepare Python Virtual Environment (Robust Method) ---
+# Create the venv structure WITHOUT pip, since ensurepip is failing.
+RUN python3 -m venv --without-pip /opt/venv
+# Download the official pip bootstrap script
+RUN curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+# Install pip into the venv using the downloaded script and the venv's python
+RUN /opt/venv/bin/python3 /tmp/get-pip.py
+# Clean up the script
+RUN rm /tmp/get-pip.py
+# Set the PATH to use the new venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # --- 4. Install Python packages into the venv ---
