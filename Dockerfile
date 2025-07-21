@@ -27,7 +27,9 @@ RUN echo "--- BUILDER: Initial Disk and Inode Usage ---" && \
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
 RUN apt-get update && apt-get install -y nodejs npm && \
-    npm install -g n && n 20 && \
+    npm install -g n && \
+    n 20 && \
+    hash -r && \
     echo "--- BUILDER: Usage before 'npm install' ---" && df -hi && \
     npm install --legacy-peer-deps && \
     npm install lowlight && \
