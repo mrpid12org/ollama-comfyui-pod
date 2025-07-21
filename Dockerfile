@@ -7,44 +7,37 @@ FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
 
-# --- 1. Install Build-Time Dependencies ---
+# --- 1. Install all build-time dependencies in one go ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
+    build-essential \
     python3.11 \
     python3.11-dev \
     python3.11-venv \
     python3-pip \
-    build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 2. DIAGNOSTIC: Show initial disk space AND inode usage ---
-RUN echo "--- BUILDER: Initial Disk and Inode Usage ---" && \
-    echo "--- [h] Disk Space (Human-Readable) ---" && df -h && \
-    echo "--- [i] Inode Usage ---" && df -i
-
-# --- 3. Build Open WebUI Frontend ---
+# --- 2. Build Open WebUI Frontend ---
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
 RUN apt-get update && apt-get install -y nodejs npm && \
     npm install -g n && \
     n 20 && \
     hash -r && \
-    echo "--- BUILDER: Usage before 'npm install' ---" && df -hi && \
     npm install --legacy-peer-deps && \
     npm install lowlight && \
-    echo "--- BUILDER: Usage AFTER 'npm install' (Peak Inodes) ---" && df -hi && \
     NODE_OPTIONS="--max-old-space-size=6144" npm run build && \
     npm cache clean --force && \
     rm -rf /app/node_modules && \
-    echo "--- BUILDER: Usage after cleanup ---" && df -hi && \
     apt-get purge -y --auto-remove nodejs npm && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 4. Prepare Python Virtual Environment ---
+# --- 3. Prepare Python Virtual Environment ---
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# --- 4. Install Python packages into the venv ---
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir wheel huggingface-hub PyYAML && \
     python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
@@ -54,10 +47,6 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     cd /opt/ComfyUI && \
     sed -i '/^torch/d' requirements.txt && \
     python3 -m pip install --no-cache-dir -r requirements.txt
-
-# --- 5. DIAGNOSTIC: Show disk space after Python setup ---
-RUN echo "--- BUILDER: Final Usage ---" && df -hi
-
 
 # =================================================================
 # Stage 2: The Final Production Image
@@ -112,8 +101,3 @@ RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
 ENTRYPOINT ["/entrypoint.sh"]
-
-# --- 7. DIAGNOSTIC: Show final disk and inode usage ---
-RUN echo "--- FINAL IMAGE: Final Usage ---" && \
-    echo "--- [h] Disk Space (Human-Readable) ---" && df -h && \
-    echo "--- [i] Inode Usage ---" && df -i
