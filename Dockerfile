@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v18-FINAL-COPY-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: v19-MIGRATION-PATH-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -67,7 +67,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV OLLAMA_MODELS=/workspace/models
-ENV COMFYUI_URL=http://12.0.0.1:8188
+ENV COMFYUI_URL="http://127.0.0.1:8188"
 ENV PATH="/opt/venv/bin:$PATH"
 
 # --- 1. Install RUNTIME-only dependencies ---
@@ -83,9 +83,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- 2. Copy built assets from the 'builder' stage ---
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/backend /app/backend
-# --- THIS IS THE FIX ---
 COPY --from=builder /app/build /app/build
-COPY --from=builder /app/migrations /app/migrations
+# --- THIS IS THE FIX ---
+COPY --from=builder /app/backend/migrations /app/backend/migrations
 COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
