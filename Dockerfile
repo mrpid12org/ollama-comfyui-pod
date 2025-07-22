@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v28-CLEAN-PIP-INSTALL ---"
+RUN echo "--- DOCKERFILE VERSION: v30-WAS-FORK ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -52,10 +52,16 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt -U
 
 # --- 5. Install ComfyUI and its requirements ---
-# --- UPDATED: Using the cleaner installation method ---
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
     python3 -m pip install --no-cache-dir -r /opt/ComfyUI/requirements.txt && \
     python3 -m pip install --no-cache-dir torchsde
+
+# --- 6. Install ComfyUI Custom Nodes ---
+RUN cd /opt/ComfyUI/custom_nodes && \
+    # --- UPDATED: Using the ltdrdata fork of WAS Node Suite ---
+    git clone https://github.com/ltdrdata/was-node-suite-comfyui.git && \
+    cd was-node-suite-comfyui && \
+    python3 -m pip install -r requirements.txt
 
 # =================================================================
 # Stage 2: The Final Production Image
