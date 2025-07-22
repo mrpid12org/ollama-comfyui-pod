@@ -4,14 +4,15 @@
 # Read the timeout from an environment variable, with a default of 1800 seconds (30 minutes).
 IDLE_TIMEOUT=${IDLE_TIMEOUT_SECONDS:-1800}
 
-# How often (in seconds) to check for activity.
-CHECK_INTERVAL=60
+# --- FIX: Check more frequently to avoid missing short tasks ---
+CHECK_INTERVAL=10
 
 # The GPU utilization percentage that is considered "active".
 GPU_UTILIZATION_THRESHOLD=10
 
-echo "--- GPU Idle Shutdown Script Started (v7 - Logging) ---"
+echo "--- GPU Idle Shutdown Script Started (v8 - Frequent Checks) ---"
 echo "Timeout is set to ${IDLE_TIMEOUT} seconds."
+echo "Check interval is set to ${CHECK_INTERVAL} seconds."
 echo "Monitoring GPU utilization. Threshold for activity: ${GPU_UTILIZATION_THRESHOLD}%"
 
 # --- Sanity Checks ---
@@ -32,24 +33,25 @@ fi
 LAST_ACTIVE=$(date +%s)
 
 while true; do
-  # Get GPU utilization.
+  # Get the highest GPU utilization across all cards.
   UTIL_OUT=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | sort -nr | head -n1)
-
-  # Log the current utilization at every check.
-  echo "INFO: $(date): GPU Util read as: ${UTIL_OUT:-'N/A'}%."
 
   # Check if we got a valid number from nvidia-smi.
   if [[ "$UTIL_OUT" =~ ^[0-9]+$ ]]; then
     CURRENT_UTILIZATION=$UTIL_OUT
     
     if [ "$CURRENT_UTILIZATION" -gt "$GPU_UTILIZATION_THRESHOLD" ]; then
+      echo "INFO: $(date): GPU is ACTIVE (Util: ${CURRENT_UTILIZATION}%). Resetting idle timer."
       LAST_ACTIVE=$(date +%s)
     else
       CURRENT_TIME=$(date +%s)
       IDLE_TIME=$((CURRENT_TIME - LAST_ACTIVE))
 
+      # --- FIX: Added more detailed logging ---
+      echo "INFO: $(date): GPU is IDLE (Util: ${CURRENT_UTILIZATION}%). Time since last activity: ${IDLE_TIME} seconds."
+
       if [ ${IDLE_TIME} -ge ${IDLE_TIMEOUT} ]; then
-        echo "GPU has been idle for ${IDLE_TIME} seconds. Terminating pod ${RUNPOD_POD_ID} using runpodctl..."
+        echo "SHUTDOWN: GPU has been idle for ${IDLE_TIME} seconds (threshold is ${IDLE_TIMEOUT}s). Terminating pod ${RUNPOD_POD_ID}..."
         runpodctl remove pod $RUNPOD_POD_ID
         echo "Termination command sent. Script will now exit."
         exit 0
