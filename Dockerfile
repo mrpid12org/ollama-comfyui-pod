@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v19-MIGRATION-PATH-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: v21-VERIFIED ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -24,7 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # --- 2. Build Open WebUI Frontend ---
 WORKDIR /app
-RUN git clone --depth 1 --branch v0.5.5 https://github.com/open-webui/open-webui.git .
+# --- UPDATED: Using latest stable version of Open WebUI ---
+RUN git clone --depth 1 --branch v0.6.18 https://github.com/open-webui/open-webui.git .
 RUN apt-get update && apt-get install -y nodejs npm && \
     npm install -g n && \
     n 20 && \
@@ -84,8 +85,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/backend /app/backend
 COPY --from=builder /app/build /app/build
-# --- THIS IS THE FIX ---
-COPY --from=builder /app/backend/migrations /app/backend/migrations
 COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
