@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v24-BASE-IMAGE-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: v25-VENV-TYPO-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y nodejs npm && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- 3. Prepare Python Virtual Environment (Robust Method) ---
-RUN python3 -m venv --without-pip /opt-venv
+# --- THIS IS THE FIX ---
+RUN python3 -m venv --without-pip /opt/venv
 RUN curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
 RUN /opt/venv/bin/python3 /tmp/get-pip.py
 RUN rm /tmp/get-pip.py
