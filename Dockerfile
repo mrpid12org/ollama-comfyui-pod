@@ -72,7 +72,8 @@ FROM nvidia/cuda:12.8.1-base-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-ENV OLLAMA_MODELS=/workspace/models
+# UPDATED: Point Ollama to the unified models directory to prevent duplication
+ENV OLLAMA_MODELS=/workspace/webui-data/user_data/models
 ENV COMFYUI_URL="http://127.0.0.1:8188"
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -94,7 +95,7 @@ COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
 # --- 3. Create required directories ---
-RUN mkdir -p /workspace/logs /workspace/models /workspace/webui-data && \
+RUN mkdir -p /workspace/logs /workspace/webui-data && \
     mkdir -p /workspace/comfyui-models/checkpoints \
              /workspace/comfyui-models/unet \
              /workspace/comfyui-models/vae \
@@ -111,10 +112,12 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # --- 5. Copy local config files and scripts ---
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
-COPY pull_model.sh /pull_model.sh
+# UPDATED: Copy the new script instead of the old one
+COPY register_local_models.sh /register_local_models.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
-RUN chmod +x /entrypoint.sh /pull_model.sh /idle_shutdown.sh
+# UPDATED: Make the new script executable
+RUN chmod +x /entrypoint.sh /register_local_models.sh /idle_shutdown.sh
 
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
