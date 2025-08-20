@@ -6,24 +6,29 @@ echo "--- Clearing previous session logs... ---"
 mkdir -p /workspace/logs
 rm -f /workspace/logs/*
 
-# --- Ollama Model Directory Symlink ---
-# Force Ollama to use the shared model directory on persistent storage.
-OLLAMA_MODELS_DIR="/root/.ollama/models"
+# --- Define persistent models directory ---
 PERSISTENT_MODELS_DIR="/workspace/webui-data/user_data/models"
 
+# --- Ensure download script exists in persistent storage ---
+DOWNLOAD_SCRIPT_DEST="$PERSISTENT_MODELS_DIR/download_and_join.sh"
+DOWNLOAD_SCRIPT_SRC="/usr/local/bin/download_and_join.sh"
+
+if [ ! -f "$DOWNLOAD_SCRIPT_DEST" ]; then
+    echo "--- Download script not found in persistent storage. Copying from image... ---"
+    cp "$DOWNLOAD_SCRIPT_SRC" "$DOWNLOAD_SCRIPT_DEST"
+fi
+
+# --- Ollama Model Directory Symlink ---
+OLLAMA_MODELS_DIR="/root/.ollama/models"
 echo "--- Configuring Ollama to use persistent model storage... ---"
-# Ensure the base directory for Ollama's config exists
 mkdir -p /root/.ollama
-# Ensure the target persistent models directory exists
 mkdir -p "$PERSISTENT_MODELS_DIR"
 
-# If the default models directory exists and is NOT a symlink, remove it.
 if [ -d "$OLLAMA_MODELS_DIR" ] && [ ! -L "$OLLAMA_MODELS_DIR" ]; then
     echo "Removing default Ollama models directory to replace with symlink."
     rm -rf "$OLLAMA_MODELS_DIR"
 fi
 
-# Create the symlink if it doesn't already exist.
 if [ ! -L "$OLLAMA_MODELS_DIR" ]; then
     echo "Linking $PERSISTENT_MODELS_DIR to $OLLAMA_MODELS_DIR..."
     ln -s "$PERSISTENT_MODELS_DIR" "$OLLAMA_MODELS_DIR"
@@ -34,13 +39,11 @@ echo "--- Ollama model storage configured. ---"
 # --- WebUI persistent data fix ---
 WEBUI_DATA_DIR="/app/backend/data"
 PERSISTENT_WEBUI_DIR="/workspace/webui-data"
-
 echo "--- Ensuring Open WebUI data is persistent... ---"
 mkdir -p "$PERSISTENT_WEBUI_DIR"
 
 if [ -d "$WEBUI_DATA_DIR" ] && [ ! -L "$WEBUI_DATA_DIR" ]; then
   echo "First run for WebUI detected. Migrating default data..."
-  # Move any existing files, ignore errors if the source is empty
   mv "$WEBUI_DATA_DIR"/* "$PERSISTENT_WEBUI_DIR/" 2>/dev/null || true
   rm -rf "$WEBUI_DATA_DIR"
 fi
