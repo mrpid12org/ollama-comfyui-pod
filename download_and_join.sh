@@ -1,5 +1,6 @@
 #!/bin/bash
-# SCRIPT V4.1 - Added 'set -e' to exit immediately on any error.
+# SCRIPT V4.2 - Reverted to 'cat' for filesystems that don't support 'fallocate'.
+# WARNING: This script requires at least 25GB of free space AFTER downloads complete.
 set -e
 
 # --- 1. Configuration ---
@@ -35,30 +36,18 @@ echo "--- Download Complete ---"
 echo "File sizes:"
 ls -lh "$FILENAME_PART1" "$FILENAME_PART2"
 
-# --- 3. Join Files Safely ---
-echo "--- Pre-allocating space for the final model... ---"
-
-# Calculate the exact total size
-SIZE_PART1=$(stat -c %s "$FILENAME_PART1")
-SIZE_PART2=$(stat -c %s "$FILENAME_PART2")
-TOTAL_SIZE=$((SIZE_PART1 + SIZE_PART2))
-
-# Create an empty file of the final size instantly
+# --- 3. Join Files using 'cat' ---
+echo "--- Joining files... This may take some time. ---"
+# This appends the content of part 2 to part 1.
 # If this fails due to lack of space, 'set -e' will stop the script here.
-fallocate -l $TOTAL_SIZE "$FINAL_MODEL_NAME"
-
-echo "--- Joining files with 'dd' (this is safe for low disk space)... ---"
-# Copy part 1 to the beginning of the new file
-dd if="$FILENAME_PART1" of="$FINAL_MODEL_NAME" bs=1M conv=notrunc
-
-# Copy part 2, seeking past the bytes of part 1
-dd if="$FILENAME_PART2" of="$FINAL_MODEL_NAME" bs=1M conv=notrunc seek=$(($SIZE_PART1 / 1048576))
-
+cat "$FILENAME_PART2" >> "$FILENAME_PART1"
 echo "--- Join complete. ---"
 
 # --- 4. Clean Up ---
-echo "--- Cleaning up temporary part files... ---"
-rm "$FILENAME_PART1" "$FILENAME_PART2"
+echo "--- Cleaning up temporary files... ---"
+rm "$FILENAME_PART2"
+echo "--- Renaming final model... ---"
+mv "$FILENAME_PART1" "$FINAL_MODEL_NAME"
 
 # --- 5. Final Verification ---
 echo "--- All Done! ---"
