@@ -1,6 +1,6 @@
 #!/bin/bash
-# SCRIPT V5.0 - Enhanced diagnostics and verbose logging.
-set -e
+# SCRIPT V6.0 - Resilient error handling.
+# NOTE: set -e is removed to allow the loop to continue if one model fails.
 
 # Give the Ollama server a generous amount of time to start.
 sleep 45
@@ -8,7 +8,7 @@ sleep 45
 MODELS_DIR="/workspace/webui-data/user_data/models"
 
 echo "============================================================"
-echo "--- Starting Local Model Registration (v5.0 Diagnostics) ---"
+echo "--- Starting Local Model Registration (v6.0 Resilient) ---"
 echo "============================================================"
 echo "Searching for GGUF models in: $MODELS_DIR"
 
@@ -39,10 +39,8 @@ find "$MODELS_DIR" -type f -name "*.gguf" -print0 | while IFS= read -r -d '' GGU
         # --- Intelligent Modelfile Creation ---
         MODELS_DIR_CONTENT=""
 
-        # Check for gpt-oss model and add its specific, full template
         if [[ "$MODEL_NAME" == *"gpt-oss"* ]]; then
             echo "           > GPT-OSS model detected. Applying official chat template."
-            # Using a quoted heredoc to pass the template literally
             MODELS_DIR_CONTENT=$(cat <<'EOF'
 FROM "%GGUF_FILE_PATH%"
 TEMPLATE """<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.
@@ -220,19 +218,18 @@ type {{ .Function.Name }} = () => any;
 """
 EOF
 )
-            # Replace placeholder with the actual file path
             MODELS_DIR_CONTENT="${MODELS_DIR_CONTENT//%GGUF_FILE_PATH%/$GGUF_FILE}"
-        fi
-
-        # Fallback to a simple Modelfile if no special case was matched
-        if [ -z "$MODELS_DIR_CONTENT" ]; then
+        else
             echo "           > Using default simple template."
             MODELS_DIR_CONTENT="FROM \"$GGUF_FILE\""
         fi
 
-        # Create the model in Ollama using the generated Modelfile content
-        ollama create "$MODEL_NAME" -f <(echo "$MODELS_DIR_CONTENT")
-        echo "[SUCCESS] Successfully registered '$MODEL_NAME'."
+        # --- Create model with explicit success/fail checking ---
+        if ollama create "$MODEL_NAME" -f <(echo "$MODELS_DIR_CONTENT"); then
+            echo "[SUCCESS] Successfully registered '$MODEL_NAME'."
+        else
+            echo "[FAILED] Registration for '$MODEL_NAME' failed. Check register_models.err for details. Continuing..."
+        fi
     fi
 done
 
