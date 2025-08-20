@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v33-NANO-ARIA2 ---"
+RUN echo "--- DOCKERFILE VERSION: v34-COMMENT-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -74,8 +74,9 @@ FROM nvidia/cuda:12.8.1-base-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-ENV OLLAMA_MODELS=/root/.ollama/models # This internal directory is symlinked to persistent storage by entrypoint.sh
-ENV COMFYUI_URL="http://127.0.0.1:8188"
+# This internal directory is symlinked to persistent storage by entrypoint.sh
+ENV OLLAMA_MODELS=/root/.ollama/models
+ENV COMFYUI_URL="http://12-27.0.0.1:8188"
 ENV PATH="/opt/venv/bin:$PATH"
 
 # --- 1. Install RUNTIME-only dependencies ---
