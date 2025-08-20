@@ -5,7 +5,7 @@
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v34-COMMENT-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: v35-PERSISTENT-SCRIPT ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -23,9 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Build Open WebUI Frontend ---
-# NOTE: The version is pinned for build stability. To get the latest features,
-# you can find the newest release tag at https://github.com/open-webui/open-webui/releases
-# and update the `--branch` tag below. Removing `--branch` will pull the main branch, which might be unstable.
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.6.18 https://github.com/open-webui/open-webui.git .
 RUN apt-get update && apt-get install -y nodejs npm && \
@@ -76,7 +73,7 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 # This internal directory is symlinked to persistent storage by entrypoint.sh
 ENV OLLAMA_MODELS=/root/.ollama/models
-ENV COMFYUI_URL="http://12-27.0.0.1:8188"
+ENV COMFYUI_URL="http://127.0.0.1:8188"
 ENV PATH="/opt/venv/bin:$PATH"
 
 # --- 1. Install RUNTIME-only dependencies ---
@@ -99,16 +96,7 @@ COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
 COPY --from=builder /opt/ComfyUI /opt/ComfyUI
 
 # --- 3. Create required directories ---
-RUN mkdir -p /workspace/logs /workspace/webui-data/user_data/models && \
-    mkdir -p /workspace/comfyui-models/checkpoints \
-             /workspace/comfyui-models/unet \
-             /workspace/comfyui-models/vae \
-             /workspace/comfyui-models/clip \
-             /workspace/comfyui-models/loras \
-             /workspace/comfyui-models/t5 \
-             /workspace/comfyui-models/controlnet \
-             /workspace/comfyui-models/embeddings \
-             /workspace/comfyui-models/hypernetworks
+RUN mkdir -p /workspace/logs /workspace/webui-data/user_data/models
 
 # --- 4. Install Ollama ---
 RUN curl -fsSL https://ollama.com/install.sh | sh
@@ -120,7 +108,9 @@ COPY entrypoint.sh /entrypoint.sh
 COPY register_local_models.sh /register_local_models.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
-RUN chmod +x /entrypoint.sh /register_local_models.sh /idle_shutdown.sh
+# --- ADDED LINE: Copy the download script into the image ---
+COPY download_and_join.sh /usr/local/bin/download_and_join.sh
+RUN chmod +x /entrypoint.sh /register_local_models.sh /idle_shutdown.sh /usr/local/bin/download_and_join.sh
 
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
