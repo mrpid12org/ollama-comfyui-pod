@@ -1,13 +1,12 @@
 #!/bin/bash
-# SCRIPT V1.0 - Automatically find and register local GGUF models with Ollama.
+# SCRIPT V3.0 - Intelligent registration for local GGUF models.
 
-# Give the Ollama server a moment to start up.
-sleep 15
+# Give the Ollama server a generous amount of time to start.
+sleep 45
 
-# This is the location where all your .gguf files are stored.
 MODELS_DIR="/workspace/webui-data/user_data/models"
 
-echo "--- Starting local model registration ---"
+echo "--- Starting local model registration (v3.0) ---"
 echo "Searching for GGUF models in: $MODELS_DIR"
 
 if [ ! -d "$MODELS_DIR" ]; then
@@ -24,16 +23,208 @@ find "$MODELS_DIR" -type f -name "*.gguf" | while read -r GGUF_FILE; do
     if ollama list | grep -q "^${MODEL_NAME}:latest"; then
         echo "Model '$MODEL_NAME' already exists in Ollama. Skipping."
     else
-        echo "Found new model: $GGUF_FILE"
-        echo "Creating Modelfile for '$MODEL_NAME'..."
+        echo "--- Found new model: $GGUF_FILE ---"
+        echo "--- Registering as model name: '$MODEL_NAME' ---"
 
-        # Define the content of the Modelfile
-        MODELS_DIR_CONTENT="FROM $GGUF_FILE"
+        # --- Intelligent Modelfile Creation ---
+        MODELS_DIR_CONTENT=""
 
-        # Create the model in Ollama using the Modelfile content
-        echo "Registering '$MODEL_NAME' with Ollama..."
+        # Check for gpt-oss model and add its specific, full template
+        if [[ "$MODEL_NAME" == *"gpt-oss"* ]]; then
+            echo "GPT-OSS model detected. Applying official chat template."
+            # Using a quoted heredoc to pass the template literally
+            MODELS_DIR_CONTENT=$(cat <<'EOF'
+FROM "%GGUF_FILE_PATH%"
+TEMPLATE """<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.
+Knowledge cutoff: 2024-06
+Current date: {{ currentDate }}
+{{- if and .IsThinkSet .Think (ne .ThinkLevel "") }}
+
+Reasoning: {{ .ThinkLevel }}
+{{- else if or (not .IsThinkSet) (and .IsThinkSet .Think) }}
+
+Reasoning: medium
+{{- end }}
+
+{{- $hasNonBuiltinTools := false }}
+{{- if .Tools -}}
+{{- $hasBrowserSearch := false }}
+{{- $hasBrowserOpen := false }}
+{{- $hasBrowserFind := false }}
+{{- $hasPython := false }}
+  {{- range .Tools }}
+    {{- if eq .Function.Name "browser.search" -}}{{- $hasBrowserSearch = true -}}
+    {{- else if eq .Function.Name "browser.open" -}}{{- $hasBrowserOpen = true -}}
+    {{- else if eq .Function.Name "browser.find" -}}{{- $hasBrowserFind = true -}}
+    {{- else if eq .Function.Name "python" -}}{{- $hasPython = true -}}
+    {{- else }}{{ $hasNonBuiltinTools = true -}}
+    {{- end }}
+  {{- end }}
+{{- if or $hasBrowserSearch $hasBrowserOpen $hasBrowserFind $hasPython }}
+
+# Tools
+{{- if or $hasBrowserSearch $hasBrowserOpen $hasBrowserFind }}
+
+## browser
+
+// Tool for browsing.
+// The `cursor` appears in brackets before each browsing display: `[{cursor}]`.
+// Cite information from the tool using the following format:
+// `【{cursor}†L{line_start}(-L{line_end})?】`, for example: `【6†L9-L11】` or `【8†L3】`.
+// Do not quote more than 10 words directly from the tool output.
+// sources=web (default: web)
+namespace browser {
+{{- if $hasBrowserSearch }}
+
+// Searches for information related to `query` and displays `topn` results.
+type search = (_: {
+query: string,
+topn?: number, // default: 10
+source?: string,
+}) => any;
+{{- end }}
+{{- if $hasBrowserOpen }}
+
+// Opens the link `id` from the page indicated by `cursor` starting at line number `loc`, showing `num_lines` lines.
+// Valid link ids are displayed with the formatting: `【{id}†.*】`.
+// If `cursor` is not provided, the most recent page is implied.
+// If `id` is a string, it is treated as a fully qualified URL associated with `source`.
+// If `loc` is not provided, the viewport will be positioned at the beginning of the document or centered on the most relevant passage, if available.
+// Use this function without `id` to scroll to a new location of an opened page.
+type open = (_: {
+id?: number | string, // default: -1
+cursor?: number, // default: -1
+loc?: number, // default: -1
+num_lines?: number, // default: -1
+view_source?: boolean, // default: false
+source?: string,
+}) => any;
+{{- end }}
+{{- if $hasBrowserFind }}
+
+// Finds exact matches of `pattern` in the current page, or the page given by `cursor`.
+type find = (_: {
+pattern: string,
+cursor?: number, // default: -1
+}) => any;
+{{- end }}
+
+} // namespace browser
+{{- end }}{{/* end if has browser tools */}}
+{{- if $hasPython }}
+
+## python
+
+Use this tool to execute Python code in your chain of thought. The code will not be shown to the user. This tool should be used for internal reasoning, but not for code that is intended to be visible to the user (e.g. when creating plots, tables, or files).
+
+When you send a message containing Python code to python, it will be executed in a stateful Jupyter notebook environment. python will respond with the output of the execution or time out after 120.0 seconds. The drive at '/mnt/data' can be used to save and persist user files. Internet access for this session is UNKNOWN. Depends on the cluster.
+{{- end }}{{/* end if hasPython */}}
+{{- end }}{{/* end if has any built-in tools */}}
+{{- end }}{{/* end if .Tools */}}
+
+# Valid channels: analysis, commentary, final. Channel must be included for every message.{{ if $hasNonBuiltinTools }}
+Calls to these tools must go to the commentary channel: 'functions'.
+{{- end -}}<|end|>{{/* end of system */ -}}
+{{- if or $hasNonBuiltinTools .System -}}
+<|start|>developer<|message|>{{- if $hasNonBuiltinTools }}# Tools
+
+## functions
+
+namespace functions {
+{{- range .Tools }}
+{{- if not (or (eq .Function.Name "browser.search") (eq .Function.Name "browser.open") (eq .Function.Name "browser.find") (eq .Function.Name "python")) }}
+{{if .Function.Description }}
+// {{ .Function.Description }}
+{{- end }}
+{{- if and .Function.Parameters.Properties (gt (len .Function.Parameters.Properties) 0) }}
+type {{ .Function.Name }} = (_: {
+{{- range $name, $prop := .Function.Parameters.Properties }}
+{{- if $prop.Description }}
+  // {{ $prop.Description }}
+{{- end }}
+  {{ $name }}: {{ $prop | toTypeScriptType }},
+{{- end }}
+}) => any;
+{{- else }}
+type {{ .Function.Name }} = () => any;
+{{- end }}
+{{- end }}{{/* end if not browser tool */}}
+{{- end }}{{/* end of range .Tools */}}
+
+} // namespace functions
+{{- end }}{{/* end if hasNonBuiltinTools */}}
+{{- if .System}}
+
+# Instructions
+
+{{ .System }}
+{{- end -}}
+<|end|>
+{{- end -}}
+{{- /* Find the index of the last user message */ -}}
+{{- $lastUserIdx := -1 }}
+{{- $prefillingContent := false }}
+{{- $prefillingThinkingOnly := false }}
+{{- range $i, $msg := .Messages }}
+  {{- $last := eq (len (slice $.Messages $i)) 1 -}}
+  {{- if eq $msg.Role "user" }}
+    {{- $lastUserIdx = $i }}
+  {{- end -}}
+  {{- if and $last (eq $msg.Role "assistant") (gt (len $msg.Content) 0) }}
+    {{- $prefillingContent = true }}
+  {{- else if and $last (eq $msg.Role "assistant") (gt (len $msg.Thinking) 0) }}
+    {{- $prefillingThinkingOnly = true }}
+  {{- end }}
+{{- end -}}
+{{- /* Now render messages */ -}}
+{{- range $i, $msg := .Messages }}
+  {{- if (ne $msg.Role "system") -}}
+    {{- if eq $msg.Role "tool" -}}
+      {{- if or (eq $msg.ToolName "python") (eq $msg.ToolName "browser.search") (eq $msg.ToolName "browser.open") (eq $msg.ToolName "browser.find") -}}
+        <|start|>{{ $msg.ToolName }} to=assistant<|message|>{{ $msg.Content }}<|end|>
+      {{- else -}}
+        <|start|>functions.{{ $msg.ToolName }} to=assistant<|message|>{{ $msg.Content }}<|end|>
+      {{- end -}}
+    {{- else if eq $msg.Role "assistant" -}}
+      {{- if and $msg.Thinking (gt $i $lastUserIdx) -}}{{- /* Show thinking only after last user message */ -}}
+      <|start|>assistant<|channel|>analysis<|message|>{{ $msg.Thinking }}{{- if not $prefillingThinkingOnly -}}<|end|>{{- end -}}
+      {{- end -}}
+      {{- if gt (len $msg.Content) 0 -}}
+        <|start|>assistant<|channel|>final<|message|>{{ $msg.Content }}{{- if not $prefillingContent -}}<|end|>{{- end -}}
+      {{- end -}}
+      {{- if gt (len $msg.ToolCalls) 0 -}}
+        {{- range $j, $toolCall := $msg.ToolCalls -}}
+          {{- $isBuiltin := or (eq $toolCall.Function.Name "python") (eq $toolCall.Function.Name "browser.search") (eq $toolCall.Function.Name "browser.open") (eq $toolCall.Function.Name "browser.find") -}}
+          <|start|>assistant<|channel|>{{ if $isBuiltin }}analysis{{ else }}commentary{{ end }} to={{ if not $isBuiltin}}functions.{{end}}{{ $toolCall.Function.Name }} <|constrain|>json<|message|>{{ $toolCall.Function.Arguments }}<|call|>
+        {{- end -}}
+      {{- end -}}
+    {{- else if eq $msg.Role "user" -}}
+      <|start|>{{ $msg.Role }}<|message|>{{ $msg.Content }}<|end|>
+    {{- end }}
+  {{- else }}
+  {{- end }}
+{{- end -}}
+{{- if not (or $prefillingContent $prefillingThinkingOnly) -}}
+<|start|>assistant
+{{- end -}}
+"""
+EOF
+)
+            # Replace placeholder with the actual file path
+            MODELS_DIR_CONTENT="${MODELS_DIR_CONTENT//%GGUF_FILE_PATH%/$GGUF_FILE}"
+        fi
+        
+        # Fallback to a simple Modelfile if no special case was matched
+        if [ -z "$MODELS_DIR_CONTENT" ]; then
+            echo "Using default simple template."
+            MODELS_DIR_CONTENT="FROM \"$GGUF_FILE\""
+        fi
+
+        echo "--- Generated Modelfile content is too long to display. ---"
+
+        # Create the model in Ollama using the generated Modelfile content
         ollama create "$MODEL_NAME" -f <(echo "$MODELS_DIR_CONTENT")
-        echo "Successfully registered '$MODEL_NAME'."
+        echo "--- Successfully registered '$MODEL_NAME'. ---"
     fi
 done
 
