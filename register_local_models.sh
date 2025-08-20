@@ -1,37 +1,47 @@
 #!/bin/bash
-# SCRIPT V3.0 - Intelligent registration for local GGUF models.
+# SCRIPT V5.0 - Enhanced diagnostics and verbose logging.
+set -e
 
 # Give the Ollama server a generous amount of time to start.
 sleep 45
 
 MODELS_DIR="/workspace/webui-data/user_data/models"
 
-echo "--- Starting local model registration (v3.0) ---"
+echo "============================================================"
+echo "--- Starting Local Model Registration (v5.0 Diagnostics) ---"
+echo "============================================================"
 echo "Searching for GGUF models in: $MODELS_DIR"
 
 if [ ! -d "$MODELS_DIR" ]; then
-    echo "Warning: Models directory not found at $MODELS_DIR. Skipping registration."
-    exit 0
+    echo "[ERROR] Models directory not found at $MODELS_DIR. Exiting."
+    exit 1
 fi
 
-# Find all GGUF files and loop through them
-find "$MODELS_DIR" -type f -name "*.gguf" | while read -r GGUF_FILE; do
+# First, list all the GGUF files we've found for clear debugging
+echo "--- Found the following GGUF files to process: ---"
+find "$MODELS_DIR" -type f -name "*.gguf" -print
+echo "----------------------------------------------------"
+
+# Use a more robust find/while loop to handle all filenames
+find "$MODELS_DIR" -type f -name "*.gguf" -print0 | while IFS= read -r -d '' GGUF_FILE; do
     # Create a clean model name from the filename
     MODEL_NAME=$(basename "$GGUF_FILE" .gguf | sed 's/[^a-zA-Z0-9._-]//g')
 
+    echo # Add a blank line for readability
+
     # Check if a model with this name already exists in Ollama
     if ollama list | grep -q "^${MODEL_NAME}:latest"; then
-        echo "Model '$MODEL_NAME' already exists in Ollama. Skipping."
+        echo "[SKIPPING] Model '$MODEL_NAME' already exists in Ollama."
     else
-        echo "--- Found new model: $GGUF_FILE ---"
-        echo "--- Registering as model name: '$MODEL_NAME' ---"
+        echo "[ATTEMPTING TO REGISTER] New model found: '$MODEL_NAME'"
+        echo "           > Source file: $GGUF_FILE"
 
         # --- Intelligent Modelfile Creation ---
         MODELS_DIR_CONTENT=""
 
         # Check for gpt-oss model and add its specific, full template
         if [[ "$MODEL_NAME" == *"gpt-oss"* ]]; then
-            echo "GPT-OSS model detected. Applying official chat template."
+            echo "           > GPT-OSS model detected. Applying official chat template."
             # Using a quoted heredoc to pass the template literally
             MODELS_DIR_CONTENT=$(cat <<'EOF'
 FROM "%GGUF_FILE_PATH%"
@@ -213,19 +223,20 @@ EOF
             # Replace placeholder with the actual file path
             MODELS_DIR_CONTENT="${MODELS_DIR_CONTENT//%GGUF_FILE_PATH%/$GGUF_FILE}"
         fi
-        
+
         # Fallback to a simple Modelfile if no special case was matched
         if [ -z "$MODELS_DIR_CONTENT" ]; then
-            echo "Using default simple template."
+            echo "           > Using default simple template."
             MODELS_DIR_CONTENT="FROM \"$GGUF_FILE\""
         fi
 
-        echo "--- Generated Modelfile content is too long to display. ---"
-
         # Create the model in Ollama using the generated Modelfile content
         ollama create "$MODEL_NAME" -f <(echo "$MODELS_DIR_CONTENT")
-        echo "--- Successfully registered '$MODEL_NAME'. ---"
+        echo "[SUCCESS] Successfully registered '$MODEL_NAME'."
     fi
 done
 
-echo "--- Model registration process complete. ---"
+echo # Add a blank line for readability
+echo "============================================================"
+echo "--- Model Registration Process Complete ---"
+echo "============================================================"
