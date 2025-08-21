@@ -1,6 +1,5 @@
-cat > /sync_textgenui.sh << 'EOL'
 #!/bin/bash
-# SCRIPT V1.2 - Uses curl to fetch model details for full compatibility.
+# SCRIPT V1.4 - Uses curl and a robust Python JSON parser.
 
 # Give other services, especially Ollama, time to finish.
 sleep 60
@@ -9,7 +8,7 @@ MODELS_DIR="/workspace/webui-data/user_data/models"
 BLOBS_DIR="$MODELS_DIR/blobs"
 
 echo "====================================================================="
-echo "--- Starting TextgenUI Symlink Sync (v1.2) ---"
+echo "--- Starting TextgenUI Symlink Sync (v1.4) ---"
 echo "====================================================================="
 
 if ! command -v ollama &> /dev/null; then
@@ -22,8 +21,8 @@ ollama list | awk '{print $1}' | tail -n +2 | while read -r MODEL_NAME_TAG; do
     echo
     echo "[INFO] Processing model: $MODEL_NAME_TAG"
     
-    # Sanitize the model name for use as a filename (replace ':' with '-')
-    SYMLINK_FILENAME=$(echo "$MODEL_NAME_TAG" | sed 's/:/-/g').gguf
+    # Sanitize the model name for use as a filename (replace ':' and slashes with '-')
+    SYMLINK_FILENAME=$(echo "$MODEL_NAME_TAG" | sed 's/[:\/]/-/g').gguf
     SYMLINK_PATH="$MODELS_DIR/$SYMLINK_FILENAME"
 
     if [ -L "$SYMLINK_PATH" ]; then
@@ -39,29 +38,39 @@ ollama list | awk '{print $1}' | tail -n +2 | while read -r MODEL_NAME_TAG; do
         continue
     fi
 
-    echo "       > Querying Ollama API for blob hash..."
+    echo "       > Querying Ollama API for blob path..."
     # Use curl to get the JSON data directly from the API
     JSON_OUTPUT=$(curl -s http://127.0.0.1:11434/api/show -d "{\"name\": \"$MODEL_NAME_TAG\"}")
 
-    # Parse the JSON output to find the main data blob's hash
-    BLOB_HASH=$(echo "$JSON_OUTPUT" | grep -A 1 '"mediaType": "application/vnd.ollama.image.model"' | tail -n 1 | grep -o 'sha256:[a-f0-9]*' | sed 's/sha256:/sha256-/g')
-
-    if [ -z "$BLOB_HASH" ]; then
-        echo "[ERROR] Could not determine blob hash for model '$MODEL_NAME_TAG'. Skipping."
+    # Use Python to robustly parse the JSON and extract the FROM line
+    BLOB_FULL_PATH=$(echo "$JSON_OUTPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    modelfile_content = data.get('modelfile', '')
+    for line in modelfile_content.split('\n'):
+        if line.startswith('FROM '):
+            print(line.split(' ', 1)[1])
+            break
+except (json.JSONDecodeError, IndexError):
+    pass
+")
+    
+    if [ -z "$BLOB_FULL_PATH" ]; then
+        echo "[ERROR] Could not determine blob path for model '$MODEL_NAME_TAG'. Skipping."
         continue
     fi
     
-    BLOB_FILE_PATH="$BLOBS_DIR/$BLOB_HASH"
+    BLOB_HASH_FILENAME=$(basename "$BLOB_FULL_PATH")
 
-    if [ -f "$BLOB_FILE_PATH" ]; then
-        echo "       > Found blob file: $BLOB_HASH"
-        echo "       > Creating symlink: $SYMLINK_FILENAME -> $BLOB_HASH"
-        ln -s "$BLOB_FILE_PATH" "$SYMLINK_PATH"
+    if [ -f "$BLOB_FULL_PATH" ]; then
+        echo "       > Found blob file: $BLOB_HASH_FILENAME"
+        echo "       > Creating symlink: $SYMLINK_FILENAME -> $BLOB_HASH_FILENAME"
+        ln -s "$BLOB_FULL_PATH" "$SYMLINK_PATH"
     else
-        echo "[ERROR] Blob file not found at '$BLOB_FILE_PATH'. Cannot create symlink."
+        echo "[ERROR] Blob file not found at '$BLOB_FULL_PATH'. Cannot create symlink."
     fi
 done
 
 echo
 echo "--- TextgenUI Symlink Sync Complete ---"
-EOL
