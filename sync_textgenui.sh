@@ -1,15 +1,15 @@
+cat > /sync_textgenui.sh << 'EOL'
 #!/bin/bash
-# SCRIPT V1.0 - Creates symlinks from Ollama's blobs to human-readable .gguf files
-# for use with other applications like text-generation-webui.
+# SCRIPT V1.2 - Uses curl to fetch model details for full compatibility.
 
-# Give other services time to finish.
+# Give other services, especially Ollama, time to finish.
 sleep 60
 
 MODELS_DIR="/workspace/webui-data/user_data/models"
 BLOBS_DIR="$MODELS_DIR/blobs"
 
 echo "====================================================================="
-echo "--- Starting TextgenUI Symlink Sync (v1.0) ---"
+echo "--- Starting TextgenUI Symlink Sync (v1.2) ---"
 echo "====================================================================="
 
 if ! command -v ollama &> /dev/null; then
@@ -39,8 +39,12 @@ ollama list | awk '{print $1}' | tail -n +2 | while read -r MODEL_NAME_TAG; do
         continue
     fi
 
-    echo "       > Querying Ollama for blob hash..."
-    BLOB_HASH=$(ollama show --json "$MODEL_NAME_TAG" | grep -A 1 '"mediaType": "application/vnd.ollama.image.model"' | tail -n 1 | grep -o 'sha256:[a-f0-9]*' | sed 's/sha256:/sha256-/g')
+    echo "       > Querying Ollama API for blob hash..."
+    # Use curl to get the JSON data directly from the API
+    JSON_OUTPUT=$(curl -s http://127.0.0.1:11434/api/show -d "{\"name\": \"$MODEL_NAME_TAG\"}")
+
+    # Parse the JSON output to find the main data blob's hash
+    BLOB_HASH=$(echo "$JSON_OUTPUT" | grep -A 1 '"mediaType": "application/vnd.ollama.image.model"' | tail -n 1 | grep -o 'sha256:[a-f0-9]*' | sed 's/sha256:/sha256-/g')
 
     if [ -z "$BLOB_HASH" ]; then
         echo "[ERROR] Could not determine blob hash for model '$MODEL_NAME_TAG'. Skipping."
@@ -60,3 +64,4 @@ done
 
 echo
 echo "--- TextgenUI Symlink Sync Complete ---"
+EOL
