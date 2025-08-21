@@ -1,11 +1,10 @@
 # =================================================================
 # Stage 1: The Builder
 # =================================================================
-# Use the full devel image with all build tools
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS builder
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: v35-PERSISTENT-SCRIPT ---"
+RUN echo "--- DOCKERFILE VERSION: v38-SIMPLIFIED-BUILD ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_ROOT_USER_ACTION=ignore
@@ -23,6 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Build Open WebUI Frontend ---
+# NOTE: The version is pinned for build stability. To get the latest features,
+# you can find the newest release tag at https://github.com/open-webui/open-webui/releases
+# and update the `--branch` tag below. Removing `--branch` will pull the main branch, which might be unstable.
 WORKDIR /app
 RUN git clone --depth 1 --branch v0.6.18 https://github.com/open-webui/open-webui.git .
 RUN apt-get update && apt-get install -y nodejs npm && \
@@ -65,14 +67,12 @@ RUN cd /opt/ComfyUI/custom_nodes && \
 # =================================================================
 # Stage 2: The Final Production Image
 # =================================================================
-# Use the smaller 'base' image for a leaner final product
 FROM nvidia/cuda:12.8.1-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-# This internal directory is symlinked to persistent storage by entrypoint.sh
-ENV OLLAMA_MODELS=/root/.ollama/models
+ENV OLLAMA_MODELS=/workspace/webui-data/user_data/models
 ENV COMFYUI_URL="http://127.0.0.1:8188"
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -105,12 +105,11 @@ RUN ollama --version
 # --- 5. Copy local config files and scripts ---
 COPY supervisord.conf /etc/supervisor/conf.d/all-services.conf
 COPY entrypoint.sh /entrypoint.sh
-COPY register_local_models.sh /register_local_models.sh
+COPY sync_textgenui.sh /sync_textgenui.sh
 COPY idle_shutdown.sh /idle_shutdown.sh
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
-# --- ADDED LINE: Copy the download script into the image ---
 COPY download_and_join.sh /usr/local/bin/download_and_join.sh
-RUN chmod +x /entrypoint.sh /register_local_models.sh /idle_shutdown.sh /usr/local/bin/download_and_join.sh
+RUN chmod +x /entrypoint.sh /sync_textgenui.sh /idle_shutdown.sh /usr/local/bin/download_and_join.sh
 
 # --- 6. Expose ports and set entrypoint ---
 EXPOSE 8888 8080 8188
